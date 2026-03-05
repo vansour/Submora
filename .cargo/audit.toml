@@ -1,0 +1,5 @@
+[advisories]
+# 忽略 RUSTSEC-2023-0071 (rsa Marvin Attack)
+# 原因：本项目仅使用 SQLite，不使用 MySQL/PostgreSQL
+# rsa 被间接引入但不会被实际调用
+ignore = ["RUSTSEC-2023-0071"]

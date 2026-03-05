@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    ignore:
+      # 忽略 RUSTSEC-2023-0071 (rsa Marvin Attack)
+      # 原因：本项目仅使用 SQLite，不使用 MySQL/PostgreSQL
+      - dependency-name: "rsa"
+      - dependency-name: "sqlx-mysql"
