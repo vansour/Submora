@@ -10,7 +10,7 @@ GitHub: https://github.com/vansour/Submora
 - 后端：`backend`
 - 共享协议：`packages/shared`
 - 共享校验与元信息：`packages/core`
-- 静态资源：`assets/`
+- 静态资源：`frontend/assets/`
 - 构建配置：`Dioxus.toml`
 - 阶段文档：`docs/rewrite/`
 
@@ -23,7 +23,7 @@ GitHub: https://github.com/vansour/Submora
 ├── packages/
 │   ├── core/          # 共享校验、元信息、纯 Rust 公共逻辑
 │   └── shared/        # 前后端共享请求/响应模型
-├── assets/            # 管理台静态样式等资源
+├── frontend/assets/   # 管理台静态样式等资源
 ├── docs/rewrite/      # 重写阶段记录
 ├── .github/workflows/ # CI / reviewdog / preview / release
 └── Makefile           # 常用开发命令入口
@@ -99,6 +99,7 @@ make build
   - `vMAJOR.MINOR.PATCH`
   - `vMAJOR.MINOR.PATCH-rc.N`
   - `vMAJOR.MINOR.PATCH-beta.N`
+- `rc` 发布除了版本 tag 外，还会额外推送 `dev` 镜像标签。
 
 ## GitHub Actions
 

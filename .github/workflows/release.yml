@@ -64,6 +64,9 @@ jobs:
               echo "${image_name}:latest"
             else
               echo "${image_name}:${tag_name}"
+              if [[ "${tag_name}" == *-rc.* ]]; then
+                echo "${image_name}:dev"
+              fi
             fi
             echo "EOF"
           } >> "${GITHUB_OUTPUT}"

@@ -19,6 +19,11 @@ pub enum Route {
 
 #[component]
 pub fn App() -> Element {
+    let _app_stylesheet = asset!(
+        "/assets/app.css",
+        AssetOptions::css().with_static_head(true)
+    );
+
     rsx! {
         Router::<Route> {}
     }

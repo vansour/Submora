@@ -4,3 +4,8 @@
 SQLX_OFFLINE = "true"
 SQLX_MYSQL = "false"
 SQLX_POSTGRES = "false"
+
+[target.wasm32-unknown-unknown]
+# Dioxus 0.7.3 currently runs wasm-opt after wasm-bindgen in release web builds.
+# Stripping DWARF here avoids a wasm-opt/Binaryen crash on recent Rust/LLVM output.
+rustflags = ["-C", "strip=debuginfo"]

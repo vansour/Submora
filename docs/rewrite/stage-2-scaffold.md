@@ -20,7 +20,7 @@ frontend/     # 新 Dioxus 前端骨架
 packages/
   shared/     # 前后端共享协议
   core/       # 共享常量、校验和纯逻辑
-assets/       # Dioxus Web 静态资源
+frontend/assets/ # Dioxus Web 静态资源
 docs/rewrite/ # 阶段文档
 ```
 

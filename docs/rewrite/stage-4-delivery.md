@@ -37,7 +37,7 @@
   - 指标卡片
   - 用户列表卡片化布局
   - 更清晰的源编辑区和账号更新区
-- `assets/app.css` 重写为新的视觉系统，补齐响应式布局、按钮体系、表单和动效。
+- `frontend/assets/app.css` 重写为新的视觉系统，补齐响应式布局、按钮体系、表单和动效。
 
 ### 测试
 
@@ -64,7 +64,7 @@
 - `backend/tests/http_flow.rs`
 - `frontend/src/components/shell.rs`
 - `frontend/src/components/console.rs`
-- `assets/app.css`
+- `frontend/assets/app.css`
 - `Dockerfile`
 - `compose.yml`
 

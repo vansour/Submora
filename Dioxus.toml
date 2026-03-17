@@ -2,7 +2,7 @@
 name = "submora"
 default_platform = "web"
 out_dir = "dist"
-asset_dir = "assets"
+asset_dir = "frontend/assets"
 sub_package = "submora-web"
 
 [web.app]
@@ -10,4 +10,4 @@ title = "Submora"
 
 [web.watcher]
 reload_html = true
-watch_path = ["frontend/src", "assets", "packages/shared/src", "packages/core/src"]
+watch_path = ["frontend/src", "frontend/assets", "packages/shared/src", "packages/core/src"]
