@@ -191,9 +191,13 @@ jobs:
       - build-and-publish-image
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
           TAG_NAME: ${{ needs.prepare.outputs.tag_name }}
           IS_PRERELEASE: ${{ needs.prepare.outputs.is_prerelease }}
         run: |
