@@ -81,6 +81,7 @@ pub fn AdminConsole(mode: &'static str, initial_user: Option<String>) -> Element
     let cache_display = CacheDisplay::from_status(cache_status.as_ref());
     let cache_state = cache_display.state.clone();
     let cache_line_count = cache_display.line_count;
+    let is_authenticated = current_user.is_some();
 
     let title = match mode {
         "login" => "Session Login",
@@ -106,11 +107,22 @@ pub fn AdminConsole(mode: &'static str, initial_user: Option<String>) -> Element
         "user" => "User Route",
         _ => "Dashboard",
     };
+    let shell_title = if is_authenticated {
+        title
+    } else {
+        "Administrator Login"
+    };
+    let shell_summary = if is_authenticated {
+        summary
+    } else {
+        "Sign in to manage users, sources, cache, and diagnostics."
+    };
 
     rsx! {
         AppShell {
-            title: title.to_string(),
-            summary: summary.to_string(),
+            title: shell_title.to_string(),
+            summary: shell_summary.to_string(),
+            compact: !is_authenticated,
             if let Some(message) = (feedback.status_message)() {
                 article { class: "notice notice--success",
                     div {

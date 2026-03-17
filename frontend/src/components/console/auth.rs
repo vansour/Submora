@@ -69,19 +69,12 @@ pub fn LoginPanel(
     refresh: RefreshState,
 ) -> Element {
     rsx! {
-        article { class: "panel panel--hero auth-panel",
-            div { class: "section-head",
-                div {
-                    h2 { "Login" }
-                    p { class: "muted", "Use the bootstrap administrator credentials or the rotated account from your previous migration pass." }
-                }
-                span { class: "tag", "Cookie Session" }
-            }
-            p { class: "panel-copy",
-                "The client fetches a CSRF token before login, stores the session cookie with browser credentials enabled, and reuses that token for every protected mutation."
+        article { class: "panel panel--hero auth-panel auth-panel--compact",
+            div { class: "section-head section-head--compact",
+                h2 { "Login" }
             }
             form {
-                class: "form-stack",
+                class: "form-stack auth-form",
                 onsubmit: move |event| {
                     event.prevent_default();
                     feedback.clear();
@@ -100,23 +93,23 @@ pub fn LoginPanel(
                         }
                     });
                 },
-                div { class: "field-grid",
-                    label { class: "field",
-                        span { "Username" }
-                        input {
-                            value: "{login_username()}",
-                            oninput: move |event| login_username.set(event.value()),
-                            placeholder: "admin"
-                        }
+                label { class: "field",
+                    span { "Username" }
+                    input {
+                        autocomplete: "username",
+                        value: "{login_username()}",
+                        oninput: move |event| login_username.set(event.value()),
+                        placeholder: "admin"
                     }
-                    label { class: "field",
-                        span { "Password" }
-                        input {
-                            r#type: "password",
-                            value: "{login_password()}",
-                            oninput: move |event| login_password.set(event.value()),
-                            placeholder: "••••••••"
-                        }
+                }
+                label { class: "field",
+                    span { "Password" }
+                    input {
+                        autocomplete: "current-password",
+                        r#type: "password",
+                        value: "{login_password()}",
+                        oninput: move |event| login_password.set(event.value()),
+                        placeholder: "••••••••"
                     }
                 }
                 button { class: "button button--primary button--wide", r#type: "submit", "Login" }

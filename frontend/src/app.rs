@@ -57,6 +57,7 @@ fn NotFound(segments: Vec<String>) -> Element {
         AppShell {
             title: "Not Found".to_string(),
             summary: format!("No Dioxus route is registered for {route}."),
+            compact: false,
             article { class: "panel",
                 div { class: "section-head",
                     div {
