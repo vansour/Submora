@@ -163,4 +163,3 @@ fn parse_fetch_host_overrides(input: &str) -> HashMap<String, Vec<SocketAddr>> {
         })
         .collect()
 }
-

@@ -70,6 +70,7 @@ pub fn submit_login(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn submit_account_update(
     current_username: String,
     next_username: String,
@@ -179,6 +180,40 @@ pub fn reordered_usernames(
     Some(order)
 }
 
+pub fn move_username_before(
+    users: &[UserSummary],
+    username: &str,
+    before_username: &str,
+) -> Option<Vec<String>> {
+    let position = users.iter().position(|item| item.username == username)?;
+    let target = users
+        .iter()
+        .position(|item| item.username == before_username)?;
+    let last_index = users.len().checked_sub(1)?;
+
+    if position == target {
+        return None;
+    }
+
+    if target == last_index {
+        return move_username_to_edge(users, username, false);
+    }
+
+    let mut order = users
+        .iter()
+        .map(|item| item.username.clone())
+        .collect::<Vec<_>>();
+    let moved = order.remove(position);
+    let adjusted_target = if position < target {
+        target.saturating_sub(1)
+    } else {
+        target
+    };
+
+    order.insert(adjusted_target, moved);
+    Some(order)
+}
+
 pub fn move_username_to_edge(
     users: &[UserSummary],
     username: &str,
@@ -204,6 +239,7 @@ pub fn move_username_to_edge(
     Some(order)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn save_links(
     username: String,
     next_links: String,
@@ -243,8 +279,10 @@ pub fn save_links(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn delete_user_and_leave<F>(
     username: String,
+    mut editor_username: Signal<Option<String>>,
     mut links_text: Signal<String>,
     drafts: LinkDraftState,
     pending: Signal<bool>,
@@ -264,57 +302,11 @@ pub fn delete_user_and_leave<F>(
         match services::delete_user(username).await {
             Ok(message) => {
                 feedback.set_status(message);
+                editor_username.set(None);
                 links_text.set(String::new());
                 clear_links_state_for_user(&deleted_username, drafts);
                 refresh.bump_after_user_change();
                 on_deleted();
-            }
-            Err(error) => feedback.set_error(error),
-        }
-    });
-}
-
-pub fn refresh_cache(
-    username: String,
-    pending: Signal<bool>,
-    feedback: FeedbackSignals,
-    refresh: RefreshState,
-) {
-    if pending() {
-        return;
-    }
-
-    feedback.clear();
-    spawn_pending(pending, async move {
-        match services::refresh_cache(username).await {
-            Ok(status) => {
-                feedback.set_status(format!(
-                    "已刷新 {} 的缓存，共 {} 行",
-                    status.username, status.line_count
-                ));
-                refresh.bump_after_cache_refresh();
-            }
-            Err(error) => feedback.set_error(error),
-        }
-    });
-}
-
-pub fn clear_cache(
-    username: String,
-    pending: Signal<bool>,
-    feedback: FeedbackSignals,
-    refresh: RefreshState,
-) {
-    if pending() {
-        return;
-    }
-
-    feedback.clear();
-    spawn_pending(pending, async move {
-        match services::clear_cache(username).await {
-            Ok(message) => {
-                feedback.set_status(message);
-                refresh.bump_cache();
             }
             Err(error) => feedback.set_error(error),
         }
@@ -368,4 +360,3 @@ fn saved_links_message(
         )
     }
 }
-

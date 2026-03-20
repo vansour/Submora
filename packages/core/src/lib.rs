@@ -104,4 +104,3 @@ pub fn normalize_links_preserve_order(
 
     Ok(normalized)
 }
-

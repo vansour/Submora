@@ -25,10 +25,6 @@ pub fn translate_backend_message(message: &str) -> String {
     translate_detail(message)
 }
 
-pub fn translate_diagnostic_detail(detail: &str) -> String {
-    translate_detail(detail)
-}
-
 pub fn extract_field_validation_error(
     message: &str,
     field_name: &str,
@@ -41,6 +37,7 @@ pub fn extract_field_validation_error(
         .map(|detail| detail.trim().to_string())
 }
 
+#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 fn translate_detail(detail: &str) -> String {
     if detail == "Please login" {
         return "请先登录".to_string();

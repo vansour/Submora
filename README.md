@@ -2,7 +2,7 @@
 
 GitHub: https://github.com/vansour/Submora
 
-`Submora` 是一个面向多用户订阅聚合场景的 Rust 项目。仓库现已完成重写阶段十一：前端使用 Dioxus `0.7.3`，后端使用 Axum `0.8.8`，统一运行时在阶段十显式代理信任边界与 SSRF DNS rebinding 防护的基础上，继续补齐边缘层安全响应头与公共聚合入口限流。
+`Submora` 是一个面向多用户订阅聚合场景的 Rust 项目。前端使用 Dioxus `0.7.3`，后端使用 Axum `0.8.8`，提供单页管理台、管理员账户管理弹窗，以及 `GET /{username}` 公共聚合路由。
 
 ## 当前架构
 
@@ -31,13 +31,13 @@ GitHub: https://github.com/vansour/Submora
 
 `packages/` 这里是 Rust 共享包目录，不是前端包管理器目录。
 
-## 阶段十一完成内容
+## 当前界面
 
-- 默认响应现在会统一附带安全响应头，包括 `X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy` 和 `Permissions-Policy`。
-- `GET /{username}` 公共聚合入口新增独立内存限流，与登录限流分开治理。
-- 公共限流继续沿用显式代理信任边界；默认只使用真实对端地址，只有在 `TRUST_PROXY_HEADERS=true` 时才会信任转发头。
-- 新增环境变量 `PUBLIC_MAX_REQUESTS` 和 `PUBLIC_WINDOW_SECS`，用于控制公共入口限流窗口。
-- 阶段十一新增测试覆盖默认安全头存在，以及公共入口连续请求超过阈值后返回 `429`。
+- 管理台只保留一个主页面。
+- 管理员账户通过右上角 `账户` 弹窗维护。
+- 订阅组通过列表行管理，支持新建、搜索和拖拽排序。
+- 订阅组编辑通过弹窗完成，链接以独立输入框逐行编辑，支持新增、删除和拖拽排序。
+- 公共聚合入口仍是 `GET /{username}`，返回 `text/plain`。
 
 ## 本地开发
 
@@ -87,6 +87,8 @@ make build
 
 - 用户名：`admin`
 - 密码：`admin`
+
+管理员账户修改后会立即使当前会话失效，需要重新登录。
 
 ## 分支与发布
 
@@ -175,11 +177,14 @@ docker compose up -d --build
 - `GET /api/auth/csrf`
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
+- `GET /api/auth/me`
 - `PUT /api/auth/account`
-- `GET /api/users/{username}/diagnostics`
-- `GET /api/users/{username}/cache`
-- `POST /api/users/{username}/cache/refresh`
-- `DELETE /api/users/{username}/cache`
+- `GET /api/users`
+- `POST /api/users`
+- `PUT /api/users/order`
+- `GET /api/users/{username}/links`
+- `PUT /api/users/{username}/links`
+- `DELETE /api/users/{username}`
 - `GET /{username}`
 
 ## 校验命令
@@ -202,9 +207,9 @@ cargo clippy -p submora-web --target wasm32-unknown-unknown -- -D warnings
 
 ## 说明
 
-- 公共聚合路由仍是 `GET /{username}`，返回 `text/plain`。
+- 管理台当前主操作集中在订阅组列表和两个弹窗：订阅组编辑、管理员账户编辑。
 - 管理会话与 merged cache snapshot 都保存在 SQLite 中，可跨服务重启保留。
-- 写接口继续沿用阶段七启用的 CSRF 校验。
+- 写接口继续沿用 CSRF 校验。
 - 过期 snapshot 现在会先返回旧值并在后台刷新，响应 header 的 `x-substore-cache` 可能出现 `hit`、`miss`、`stale` 和 `empty`。
 - `FETCH_HOST_OVERRIDES` 可用于显式静态解析上游 host，主要用于内网联调；默认留空，不会改变公网抓取边界。
-- 阶段记录见 `docs/rewrite/stage-1-baseline.md` 到 `docs/rewrite/stage-11-edge-hardening.md`。
+- 历史重写记录仍保留在 `docs/rewrite/` 目录。

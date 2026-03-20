@@ -83,6 +83,9 @@ tarpaulin-report.html
 
 # JavaScript artifacts
 node_modules/
+playwright-report/
+test-results/
+.playwright/
 
 # Python cache
 __pycache__/

@@ -1,74 +1,73 @@
-.console-sidebar .panel,
-.console-main > .panel,
-.workspace-primary > .panel,
-.console-support > .panel {
-  padding: 22px;
-}
-
-.console-layout,
-.workspace-canvas,
-.workspace-primary,
-.console-support {
+.console-frame {
   display: grid;
-  gap: 22px;
+  gap: 14px;
 }
 
-.console-layout {
-  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
-  align-items: start;
-}
-
-.console-layout > .console-sidebar {
-  grid-column: 1;
-  grid-row: 1;
-}
-
-.console-layout > .console-main {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.console-sidebar {
-  position: sticky;
-  top: 24px;
+.console-workbench {
+  --console-side-width: 320px;
   display: grid;
-  gap: 18px;
-  align-self: start;
-}
-
-.console-main {
-  display: grid;
-  gap: 24px;
-  min-width: 0;
-}
-
-.workspace-canvas {
-  grid-template-columns: minmax(0, 1.18fr) minmax(300px, 360px);
-  align-items: start;
-}
-
-.workspace-primary {
-  gap: 20px;
-  min-width: 0;
-}
-
-.workspace-primary > .editor-panel {
-  border-color: rgba(200, 95, 49, 0.18);
-  box-shadow: 0 28px 72px rgba(23, 32, 51, 0.12);
-}
-
-.console-support {
-  gap: 18px;
-  align-content: start;
-}
-
-.console-support > .panel {
-  box-shadow: var(--shadow-soft);
-}
-
-.account-shell {
-  max-width: 820px;
+  gap: 14px;
+  width: 100%;
+  max-width: 1240px;
   margin: 0 auto;
+}
+
+.console-menu {
+  position: sticky;
+  top: 18px;
+  z-index: 6;
+  width: 100%;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.console-workbench > .users-panel {
+  min-width: 0;
+}
+
+.console-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
   display: grid;
-  gap: 20px;
+  place-items: center;
+  padding: 28px 20px;
+  background: rgba(16, 24, 37, 0.34);
+  backdrop-filter: blur(20px);
+}
+
+.console-modal {
+  width: min(100%, 1100px);
+  max-height: calc(100vh - 56px);
+  overflow: auto;
+  padding-bottom: 4px;
+}
+
+.console-modal--wide {
+  width: min(100%, 1180px);
+}
+
+.console-modal--narrow {
+  width: min(100%, 720px);
+}
+
+.console-modal__close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 2;
+  max-width: calc(100% - 32px);
+  white-space: nowrap;
+  border-radius: var(--radius-compact);
+  box-shadow: none;
+  backdrop-filter: blur(16px);
+}
+
+.console-modal > .panel {
+  position: relative;
+  margin: 0;
+}
+
+.console-modal--wide .editor-panel {
+  box-shadow: 0 30px 84px rgba(20, 29, 44, 0.14);
 }

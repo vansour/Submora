@@ -41,7 +41,6 @@ code {
 }
 
 .eyebrow,
-.stat-kicker,
 .field span {
   margin: 0;
   color: var(--cool);
@@ -260,9 +259,42 @@ textarea:focus-visible {
   background: var(--surface-card-strong);
 }
 
+.notice__body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
 .notice strong {
   display: block;
   margin-bottom: 4px;
+}
+
+.toast-viewport {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 80;
+  display: grid;
+  gap: 10px;
+  width: min(calc(100vw - 24px), 24rem);
+  pointer-events: none;
+}
+
+.toast-viewport > * {
+  pointer-events: auto;
+}
+
+.notice--toast {
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 12px;
+  backdrop-filter: blur(18px);
+  animation: toast-cycle 4.4s ease both;
+}
+
+.notice__close {
+  align-self: flex-start;
+  flex: 0 0 auto;
 }
 
 .notice--success {
@@ -310,6 +342,7 @@ textarea:focus-visible {
   justify-content: space-between;
   gap: 14px;
   margin-bottom: 16px;
+  padding-right: 84px;
 }
 
 .section-head h2 {
@@ -336,5 +369,23 @@ textarea:focus-visible {
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes toast-cycle {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+
+  10%,
+  82% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
   }
 }

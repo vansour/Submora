@@ -236,4 +236,3 @@ fn forwarded_ip(headers: &HeaderMap) -> Option<IpAddr> {
                 .and_then(|value| value.parse().ok())
         })
 }
-

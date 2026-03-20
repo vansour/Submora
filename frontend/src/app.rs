@@ -7,12 +7,6 @@ use crate::components::{console::AdminConsole, shell::AppShell};
 pub enum Route {
     #[route("/")]
     Dashboard {},
-    #[route("/login")]
-    Login {},
-    #[route("/users/:username")]
-    UserDetail { username: String },
-    #[route("/account")]
-    Account {},
     #[route("/:..segments")]
     NotFound { segments: Vec<String> },
 }
@@ -33,22 +27,7 @@ pub fn App() -> Element {
 
 #[component]
 fn Dashboard() -> Element {
-    rsx! { AdminConsole { mode: "dashboard", route_user: None } }
-}
-
-#[component]
-fn Login() -> Element {
-    rsx! { AdminConsole { mode: "login", route_user: None } }
-}
-
-#[component]
-fn UserDetail(username: String) -> Element {
-    rsx! { AdminConsole { mode: "user", route_user: Some(username) } }
-}
-
-#[component]
-fn Account() -> Element {
-    rsx! { AdminConsole { mode: "account", route_user: None } }
+    rsx! { AdminConsole {} }
 }
 
 #[component]
@@ -57,23 +36,13 @@ fn NotFound(segments: Vec<String>) -> Element {
 
     rsx! {
         AppShell {
-            title: "页面未找到".to_string(),
-            summary: format!("没有为 {route} 注册 Dioxus 路由。"),
             compact: false,
-            active_mode: None,
-            selected_user: None,
             article { class: "panel",
                 div { class: "section-head",
                     div {
-                        h2 { "该路由由其他层处理" }
-                        p { class: "muted", "管理控制台只接管显式声明的 Dioxus 页面。" }
+                        h2 { "页面未找到" }
                     }
                     span { class: "tag", "{route}" }
-                }
-                p { class: "panel-copy",
-                    "公共订阅路由 "
-                    code { {"/{username}".to_string()} }
-                    " 仍由 Axum 处理，因此聚合后的文本响应不会经过 Dioxus 路由。"
                 }
             }
         }

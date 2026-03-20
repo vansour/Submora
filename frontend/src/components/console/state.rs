@@ -3,9 +3,8 @@ use std::collections::HashMap;
 use dioxus::prelude::*;
 use submora_shared::{
     auth::CurrentUserResponse,
-    users::{UserCacheStatusResponse, UserDiagnosticsResponse, UserLinksResponse, UserSummary},
+    users::{UserLinksResponse, UserSummary},
 };
-use time::{OffsetDateTime, format_description::parse};
 
 use super::services;
 
@@ -35,8 +34,6 @@ pub struct RefreshState {
     pub auth: Signal<u32>,
     pub users: Signal<u32>,
     pub links: Signal<u32>,
-    pub diagnostics: Signal<u32>,
-    pub cache: Signal<u32>,
 }
 
 impl RefreshState {
@@ -52,18 +49,8 @@ impl RefreshState {
         self.links.set((self.links)() + 1);
     }
 
-    pub fn bump_diagnostics(mut self) {
-        self.diagnostics.set((self.diagnostics)() + 1);
-    }
-
-    pub fn bump_cache(mut self) {
-        self.cache.set((self.cache)() + 1);
-    }
-
     pub fn bump_selected_data(self) {
         self.bump_links();
-        self.bump_diagnostics();
-        self.bump_cache();
     }
 
     pub fn bump_after_auth_change(self) {
@@ -76,11 +63,6 @@ impl RefreshState {
         self.bump_users();
         self.bump_selected_data();
     }
-
-    pub fn bump_after_cache_refresh(self) {
-        self.bump_cache();
-        self.bump_diagnostics();
-    }
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -92,8 +74,6 @@ pub struct PendingState {
     pub reorder_users: Signal<bool>,
     pub save_links: Signal<bool>,
     pub delete_user: Signal<bool>,
-    pub refresh_cache: Signal<bool>,
-    pub clear_cache: Signal<bool>,
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -108,66 +88,16 @@ pub struct ConsoleResources {
     pub auth_resource: Resource<Result<Option<CurrentUserResponse>, String>>,
     pub users_resource: Resource<Result<Vec<UserSummary>, String>>,
     pub links_resource: Resource<Result<Option<UserLinksResponse>, String>>,
-    pub diagnostics_resource: Resource<Result<Option<UserDiagnosticsResponse>, String>>,
-    pub cache_resource: Resource<Result<Option<UserCacheStatusResponse>, String>>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct CacheDisplay {
-    pub state: String,
-    pub line_count: u32,
-    pub body_bytes: u64,
-    pub generated_at: String,
-    pub expires_at: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct ResourceSnapshot<T> {
     pub value: Option<T>,
-    pub error: Option<String>,
 }
 
 impl<T> Default for ResourceSnapshot<T> {
     fn default() -> Self {
-        Self {
-            value: None,
-            error: None,
-        }
-    }
-}
-
-impl CacheDisplay {
-    pub fn from_status(status: Option<&UserCacheStatusResponse>) -> Self {
-        Self {
-            state: status
-                .map(|status| status.state.clone())
-                .unwrap_or_else(|| "empty".to_string()),
-            line_count: status.map(|status| status.line_count).unwrap_or_default(),
-            body_bytes: status.map(|status| status.body_bytes).unwrap_or_default(),
-            generated_at: format_timestamp(
-                status.and_then(|status| status.generated_at),
-                "尚未生成",
-            ),
-            expires_at: format_timestamp(status.and_then(|status| status.expires_at), "不适用"),
-        }
-    }
-
-    pub fn state_class(&self) -> &'static str {
-        match self.state.as_str() {
-            "fresh" => "tag--success",
-            "expired" | "stale" => "tag--danger",
-            _ => "tag--cool",
-        }
-    }
-
-    pub fn state_label(&self) -> &'static str {
-        match self.state.as_str() {
-            "fresh" => "新鲜",
-            "expired" => "已过期",
-            "stale" => "陈旧",
-            "empty" => "为空",
-            _ => "未知",
-        }
+        Self { value: None }
     }
 }
 
@@ -183,8 +113,6 @@ pub fn use_refresh_state() -> RefreshState {
         auth: use_signal(|| 0u32),
         users: use_signal(|| 0u32),
         links: use_signal(|| 0u32),
-        diagnostics: use_signal(|| 0u32),
-        cache: use_signal(|| 0u32),
     }
 }
 
@@ -197,8 +125,6 @@ pub fn use_pending_state() -> PendingState {
         reorder_users: use_signal(|| false),
         save_links: use_signal(|| false),
         delete_user: use_signal(|| false),
-        refresh_cache: use_signal(|| false),
-        clear_cache: use_signal(|| false),
     }
 }
 
@@ -214,9 +140,7 @@ pub fn use_console_resources(
     selected_username: Option<String>,
     refresh: RefreshState,
 ) -> ConsoleResources {
-    let selected_username_for_links = selected_username.clone();
-    let selected_username_for_diagnostics = selected_username.clone();
-    let selected_username_for_cache = selected_username;
+    let selected_username_for_links = selected_username;
 
     let auth_resource = use_resource(move || async move {
         let _ = (refresh.auth)();
@@ -230,23 +154,11 @@ pub fn use_console_resources(
         let _ = (refresh.links)();
         services::load_links(selected_username_for_links.clone()).await
     }));
-    let diagnostics_resource = use_resource(use_reactive!(|(
-        selected_username_for_diagnostics,
-    )| async move {
-        let _ = (refresh.diagnostics)();
-        services::load_diagnostics(selected_username_for_diagnostics.clone()).await
-    }));
-    let cache_resource = use_resource(use_reactive!(|(selected_username_for_cache,)| async move {
-        let _ = (refresh.cache)();
-        services::load_cache_status(selected_username_for_cache.clone()).await
-    }));
 
     ConsoleResources {
         auth_resource,
         users_resource,
         links_resource,
-        diagnostics_resource,
-        cache_resource,
     }
 }
 
@@ -254,12 +166,8 @@ pub fn resource_snapshot<T: Clone>(resource: &Resource<Result<T, String>>) -> Re
     match &*resource.read_unchecked() {
         Some(Ok(value)) => ResourceSnapshot {
             value: Some(value.clone()),
-            error: None,
         },
-        Some(Err(error)) => ResourceSnapshot {
-            value: None,
-            error: Some(error.clone()),
-        },
+        Some(Err(_)) => ResourceSnapshot { value: None },
         None => ResourceSnapshot::default(),
     }
 }
@@ -270,13 +178,9 @@ pub fn optional_resource_snapshot<T: Clone>(
     match &*resource.read_unchecked() {
         Some(Ok(Some(value))) => ResourceSnapshot {
             value: Some(value.clone()),
-            error: None,
         },
         Some(Ok(None)) => ResourceSnapshot::default(),
-        Some(Err(error)) => ResourceSnapshot {
-            value: None,
-            error: Some(error.clone()),
-        },
+        Some(Err(_)) => ResourceSnapshot { value: None },
         None => ResourceSnapshot::default(),
     }
 }
@@ -394,22 +298,6 @@ pub fn has_unsaved_links(
             .unwrap_or_default()
 }
 
-pub fn format_timestamp(value: Option<i64>, empty: &str) -> String {
-    let Ok(display_format) = parse("[year]-[month]-[day] [hour]:[minute] UTC") else {
-        return value.map_or_else(|| empty.to_string(), |timestamp| timestamp.to_string());
-    };
-
-    match value {
-        Some(value) => match OffsetDateTime::from_unix_timestamp(value) {
-            Ok(timestamp) => timestamp
-                .format(&display_format)
-                .unwrap_or_else(|_| value.to_string()),
-            Err(_) => value.to_string(),
-        },
-        None => empty.to_string(),
-    }
-}
-
 fn display_links_for_user(
     username: &str,
     saved_by_user: &HashMap<String, String>,
@@ -439,4 +327,3 @@ fn update_draft_map(
         draft_by_user.insert(username.to_string(), next_text.to_string());
     }
 }
-

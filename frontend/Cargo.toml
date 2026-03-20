@@ -13,4 +13,4 @@ submora-shared = { path = "../packages/shared" }
 dioxus = { workspace = true, features = ["web", "router"] }
 gloo-net = { version = "0.6", features = ["json"] }
 serde.workspace = true
-web-sys = { version = "0.3", features = ["RequestCredentials"] }
+web-sys = { version = "0.3", features = ["RequestCredentials", "Window"] }

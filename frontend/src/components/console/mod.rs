@@ -1,9 +1,6 @@
 mod actions;
 mod auth;
-mod cache;
-mod diagnostics;
 mod editor;
-mod overview;
 mod services;
 mod state;
 mod users;
@@ -13,20 +10,17 @@ use dioxus::prelude::*;
 
 use crate::components::shell::AppShell;
 use auth::{AccountPanel, ControlPlanePanel, LoginPanel};
-use cache::CachePanel;
-use diagnostics::DiagnosticsPanel;
 use editor::EditorPanel;
-use overview::UserOverview;
 use state::{
-    has_unsaved_links, optional_resource_snapshot, resource_snapshot, sync_links_text,
-    use_console_resources, use_feedback_signals, use_link_draft_state, use_pending_state,
-    use_refresh_state,
+    FeedbackSignals, has_unsaved_links, optional_resource_snapshot, resource_snapshot,
+    sync_links_text, use_console_resources, use_feedback_signals, use_link_draft_state,
+    use_pending_state, use_refresh_state,
 };
 use users::UsersPanel;
-use view::{ConsolePageMeta, UserSummary};
+use view::UserSummary;
 
 #[component]
-pub fn AdminConsole(mode: &'static str, route_user: Option<String>) -> Element {
+pub fn AdminConsole() -> Element {
     let login_username = use_signal(String::new);
     let login_password = use_signal(String::new);
     let create_username = use_signal(String::new);
@@ -34,14 +28,16 @@ pub fn AdminConsole(mode: &'static str, route_user: Option<String>) -> Element {
     let account_username = use_signal(String::new);
     let account_current_password = use_signal(String::new);
     let account_new_password = use_signal(String::new);
+    let mut selected_username = use_signal(|| None::<String>);
+    let mut account_modal_open = use_signal(|| false);
 
     let feedback = use_feedback_signals();
     let link_drafts = use_link_draft_state();
     let pending = use_pending_state();
     let refresh = use_refresh_state();
-    let resources = use_console_resources(route_user.clone(), refresh);
+    let resources = use_console_resources(selected_username(), refresh);
     sync_links_text(
-        route_user.clone(),
+        selected_username(),
         links_text,
         resources.links_resource,
         link_drafts,
@@ -49,179 +45,81 @@ pub fn AdminConsole(mode: &'static str, route_user: Option<String>) -> Element {
 
     let current_user = optional_resource_snapshot(&resources.auth_resource);
     let users = resource_snapshot(&resources.users_resource);
-    let cache_status = optional_resource_snapshot(&resources.cache_resource);
-    let diagnostics = optional_resource_snapshot(&resources.diagnostics_resource);
-
-    let page = ConsolePageMeta::build(mode, route_user, current_user.value.clone());
-    let user_count = users.value.as_ref().map(Vec::len).unwrap_or_default();
     let current_links_text = links_text();
     let has_unsaved_changes = has_unsaved_links(
-        page.selected_username.as_deref(),
+        selected_username().as_deref(),
         &current_links_text,
         link_drafts,
     );
-    let user_summary = UserSummary::build(
-        page.selected_username.clone(),
-        user_count,
-        &current_links_text,
-        cache_status.value.as_ref(),
-        diagnostics.value.as_ref(),
-    );
+    let user_summary = UserSummary::build(selected_username());
     let has_selected_user = user_summary.is_some();
+    let is_authenticated = current_user.value.is_some();
+    let current_username = current_user
+        .value
+        .clone()
+        .map(|user| user.username)
+        .unwrap_or_default();
 
     rsx! {
         AppShell {
-            title: page.shell_title.clone(),
-            summary: page.shell_summary.clone(),
-            compact: !page.is_authenticated,
-            active_mode: if page.is_authenticated { Some(page.active_mode) } else { None },
-            selected_user: page.selected_username.clone(),
-            if let Some(message) = (feedback.status_message)() {
-                article {
-                    class: "notice notice--success",
-                    role: "status",
-                    "aria-live": "polite",
-                    "aria-atomic": "true",
-                    div {
-                        strong { "操作完成" }
-                        p { "{message}" }
-                    }
-                }
-            }
-            if let Some(message) = (feedback.error_message)() {
-                article {
-                    class: "notice notice--error",
-                    role: "alert",
-                    "aria-live": "assertive",
-                    "aria-atomic": "true",
-                    div {
-                        strong { "操作失败" }
-                        p { "{message}" }
-                    }
-                }
-            }
+            compact: !is_authenticated,
+            ToastViewport { feedback }
             if let Some(username) = current_user.value.clone().map(|user| user.username) {
-                if page.active_mode == "account" {
-                    div { class: "account-shell",
-                        ControlPlanePanel {
-                            username,
-                            selected_username: page.selected_username.clone(),
-                            show_selection: false,
-                            links_text,
+                div { class: "console-frame",
+                    ControlPlanePanel {
+                        username,
+                        selected_username: selected_username(),
+                        account_modal_open,
+                        links_text,
+                        pending,
+                        feedback,
+                        refresh,
+                    }
+                    section { class: "console-workbench",
+                        UsersPanel {
+                            create_username,
+                            users: users.value.clone(),
+                            selected_username: selected_username(),
+                            editor_username: selected_username,
                             pending,
                             feedback,
                             refresh,
                         }
+                    }
+                }
+                if account_modal_open() {
+                    ConsoleModal {
+                        label: "管理员账户",
+                        size_class: "console-modal--narrow",
+                        onclose: move |_| account_modal_open.set(false),
                         AccountPanel {
                             account_username,
                             account_current_password,
                             account_new_password,
-                            current_username: page.current_username.clone(),
+                            current_username,
+                            onclose: move |_| account_modal_open.set(false),
                             pending,
                             feedback,
                             refresh,
                         }
                     }
-                } else {
-                    div { class: "console-layout",
-                        if has_selected_user {
-                            aside { class: "console-sidebar",
-                                ControlPlanePanel {
-                                    username,
-                                    selected_username: page.selected_username.clone(),
-                                    show_selection: true,
-                                    links_text,
-                                    pending,
-                                    feedback,
-                                    refresh,
-                                }
-                                UsersPanel {
-                                    create_username,
-                                    users: users.value.clone(),
-                                    selected_username: page.selected_username.clone(),
-                                    pending,
-                                    feedback,
-                                    refresh,
-                                }
-                            }
-                            section { class: "console-main",
-                                if let Some(user_summary) = user_summary.clone() {
-                                    UserOverview { summary: user_summary.clone() }
-                                    div { class: "workspace-canvas",
-                                        div { class: "workspace-primary",
-                                            EditorPanel {
-                                                username: user_summary.selected_username.clone(),
-                                                selected_route: user_summary.selected_route.clone(),
-                                                links_text,
-                                                selected_link_count: user_summary.selected_link_count,
-                                                drafts: link_drafts,
-                                                has_unsaved_changes,
-                                                pending,
-                                                feedback,
-                                                refresh,
-                                            }
-                                        }
-                                        aside { class: "console-support",
-                                            CachePanel {
-                                                username: user_summary.selected_username.clone(),
-                                                cache: user_summary.cache_display.clone(),
-                                                cache_error: cache_status.error.clone(),
-                                                pending,
-                                                feedback,
-                                                refresh,
-                                            }
-                                            DiagnosticsPanel {
-                                                diagnostics: diagnostics.value.clone(),
-                                                diagnostics_error: diagnostics.error.clone(),
-                                                success_count: user_summary.success_count,
-                                                error_count: user_summary.error_count,
-                                                blocked_count: user_summary.blocked_count,
-                                                pending_count: user_summary.pending_count,
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        } else {
-                            aside { class: "console-sidebar",
-                                ControlPlanePanel {
-                                    username,
-                                    selected_username: page.selected_username.clone(),
-                                    show_selection: true,
-                                    links_text,
-                                    pending,
-                                    feedback,
-                                    refresh,
-                                }
-                                UsersPanel {
-                                    create_username,
-                                    users: users.value.clone(),
-                                    selected_username: page.selected_username.clone(),
-                                    pending,
-                                    feedback,
-                                    refresh,
-                                }
-                            }
-                            section { class: "console-main",
-                                article { class: "panel panel--editor panel--empty",
-                                    div { class: "section-head",
-                                        div {
-                                            p { class: "eyebrow", "订阅组" }
-                                            h2 { "请先选择一个订阅组" }
-                                            p { class: "muted", "从左侧列表选择已有订阅组，或新建一个订阅组后开始配置。" }
-                                        }
-                                        span { class: "tag", "共 {user_count} 个订阅组" }
-                                    }
-                                    div { class: "empty-state empty-user__copy",
-                                        strong { "订阅组待选择" }
-                                        p { "选中订阅组后，这里会展示对应的源链接、缓存状态和抓取诊断信息。" }
-                                    }
-                                    if users.value.is_some() {
-                                        p { class: "muted empty-user__note",
-                                            "左侧订阅组列表是唯一入口：可直接进入已有订阅组，或在新建订阅组表单中创建后进入。"
-                                        }
-                                    }
-                                }
+                }
+                if has_selected_user {
+                    if let Some(user_summary) = user_summary.clone() {
+                        ConsoleModal {
+                            label: "编辑订阅组",
+                            size_class: "console-modal--wide",
+                            onclose: move |_| selected_username.set(None),
+                            EditorPanel {
+                                username: user_summary.selected_username.clone(),
+                                onclose: move |_| selected_username.set(None),
+                                editor_username: selected_username,
+                                links_text,
+                                drafts: link_drafts,
+                                has_unsaved_changes,
+                                pending,
+                                feedback,
+                                refresh,
                             }
                         }
                     }
@@ -234,6 +132,97 @@ pub fn AdminConsole(mode: &'static str, route_user: Option<String>) -> Element {
                     feedback,
                     refresh,
                 }
+            }
+        }
+    }
+}
+
+#[component]
+fn ToastViewport(feedback: FeedbackSignals) -> Element {
+    let status_message = (feedback.status_message)();
+    let error_message = (feedback.error_message)();
+
+    if status_message.is_none() && error_message.is_none() {
+        return rsx! {};
+    }
+
+    rsx! {
+        div { class: "toast-viewport",
+            if let Some(message) = status_message {
+                ToastNotice {
+                    key: "status-{message}",
+                    title: "操作完成",
+                    message,
+                    tone_class: "notice--success",
+                    role: "status",
+                    live: "polite",
+                    clear_signal: feedback.status_message,
+                }
+            }
+            if let Some(message) = error_message {
+                ToastNotice {
+                    key: "error-{message}",
+                    title: "操作失败",
+                    message,
+                    tone_class: "notice--error",
+                    role: "alert",
+                    live: "assertive",
+                    clear_signal: feedback.error_message,
+                }
+            }
+        }
+    }
+}
+
+#[component]
+fn ToastNotice(
+    title: &'static str,
+    message: String,
+    tone_class: &'static str,
+    role: &'static str,
+    live: &'static str,
+    mut clear_signal: Signal<Option<String>>,
+) -> Element {
+    rsx! {
+        article {
+            class: "notice notice--toast {tone_class}",
+            role: "{role}",
+            "aria-live": "{live}",
+            "aria-atomic": "true",
+            onanimationend: move |_| clear_signal.set(None),
+            div { class: "notice__body",
+                strong { "{title}" }
+                p { "{message}" }
+            }
+            button {
+                class: "button button--ghost button--compact notice__close",
+                r#type: "button",
+                onclick: move |_| clear_signal.set(None),
+                "关闭"
+            }
+        }
+    }
+}
+
+#[component]
+fn ConsoleModal(
+    label: &'static str,
+    size_class: &'static str,
+    onclose: EventHandler<()>,
+    children: Element,
+) -> Element {
+    rsx! {
+        div {
+            class: "console-modal-backdrop",
+            role: "presentation",
+            onclick: move |_| onclose.call(()),
+            div {
+                class: "console-modal {size_class}",
+                role: "dialog",
+                "aria-modal": "true",
+                "aria-label": "{label}",
+                onclick: move |event| event.stop_propagation(),
+                {children}
             }
         }
     }

@@ -84,7 +84,6 @@ impl PinnedClientPool {
         clients.insert(key, client.clone());
         Ok(client)
     }
-
 }
 
 impl DnsResolver {
@@ -777,4 +776,3 @@ struct AttemptMetadata {
     redirect_count: u8,
     is_html: bool,
 }
-

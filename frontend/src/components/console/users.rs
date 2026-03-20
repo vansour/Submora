@@ -1,59 +1,51 @@
 use dioxus::prelude::*;
 use submora_shared::users::UserSummary;
 
-use crate::app::Route;
-
 use super::{
     actions,
     state::{FeedbackSignals, PendingState, RefreshState},
 };
+
+#[derive(Clone, Debug, PartialEq)]
+enum SortDropTarget {
+    Row(String),
+}
 
 #[component]
 pub fn UsersPanel(
     mut create_username: Signal<String>,
     users: Option<Vec<UserSummary>>,
     selected_username: Option<String>,
+    mut editor_username: Signal<Option<String>>,
     pending: PendingState,
     feedback: FeedbackSignals,
     refresh: RefreshState,
 ) -> Element {
-    let navigator = use_navigator();
+    let mut search_input = use_signal(String::new);
     let mut search_query = use_signal(String::new);
+    let dragging_username = use_signal(|| None::<String>);
+    let drop_target = use_signal(|| None::<SortDropTarget>);
     let user_list = users.clone().unwrap_or_default();
     let user_count = user_list.len();
     let selected = selected_username.clone();
     let create_pending = (pending.create_user)();
-    let search_value = search_query();
-    let normalized_query = search_value.trim().to_ascii_lowercase();
+    let reorder_pending = (pending.reorder_users)();
+    let search_value = search_input();
+    let normalized_query = search_query().trim().to_ascii_lowercase();
     let sorting_enabled = normalized_query.is_empty();
-    let visible_users = if sorting_enabled {
-        user_list.clone()
-    } else {
-        user_list
-            .iter()
-            .filter(|user| {
-                user.username
-                    .to_ascii_lowercase()
-                    .contains(&normalized_query)
-            })
-            .cloned()
-            .collect::<Vec<_>>()
-    };
-    let visible_count = visible_users.len();
+    let visible_users = filter_users(&user_list, &normalized_query);
 
     rsx! {
         article { class: "panel users-panel",
             div { class: "section-head",
                 div {
-                    p { class: "eyebrow", "订阅组" }
                     h2 { "订阅组列表" }
-                    p { class: "muted", "每个订阅组都会对应一个公开订阅地址。" }
                 }
-                span { class: "tag", "{user_count} 个订阅组" }
+                strong { "{user_count}" }
             }
-            div { class: "users-panel__composer",
+            div { class: "users-panel__tools",
                 form {
-                    class: "inline-form",
+                    class: "inline-form users-panel__create",
                     onsubmit: move |event| {
                         event.prevent_default();
                         actions::create_user_and_open(
@@ -62,53 +54,48 @@ pub fn UsersPanel(
                             pending.create_user,
                             feedback,
                             refresh,
-                            move |username| {
-                                navigator.push(Route::UserDetail { username });
-                            },
+                            move |username| editor_username.set(Some(username)),
                         );
                     },
-                    label { class: "field field--inline",
-                        span { "新建订阅组" }
-                        input {
-                            disabled: create_pending,
-                            value: "{create_username()}",
-                            oninput: move |event| create_username.set(event.value()),
-                            placeholder: "alpha-feed"
-                        }
+                    input {
+                        class: "users-panel__input",
+                        disabled: create_pending,
+                        value: "{create_username()}",
+                        oninput: move |event| create_username.set(event.value()),
+                        placeholder: "alpha-feed"
                     }
                     button {
-                        class: "button button--primary",
+                        class: "button button--primary button--compact",
                         r#type: "submit",
                         disabled: create_pending,
                         aria_busy: if create_pending { "true" } else { "false" },
                         if create_pending { "创建中…" } else { "新建" }
                     }
                 }
-            }
-            if users.is_some() && !user_list.is_empty() {
-                div { class: "users-panel__toolbar",
-                    label { class: "field field--inline users-panel__search",
-                        span { "筛选订阅组" }
+                if users.is_some() && !user_list.is_empty() {
+                    form {
+                        class: "inline-form users-panel__search",
+                        onsubmit: move |event| {
+                            event.prevent_default();
+                            search_query.set(search_input());
+                        },
                         input {
+                            class: "users-panel__input",
                             value: "{search_value}",
-                            oninput: move |event| search_query.set(event.value()),
-                            placeholder: "按用户名搜索"
+                            oninput: move |event| {
+                                let value = event.value();
+                                if value.trim().is_empty() {
+                                    search_query.set(String::new());
+                                }
+                                search_input.set(value);
+                            },
+                            placeholder: "订阅组名"
                         }
-                    }
-                    div { class: "button-row users-panel__toolbar-actions",
-                        if !sorting_enabled {
-                            button {
-                                class: "button button--ghost button--compact",
-                                r#type: "button",
-                                onclick: move |_| search_query.set(String::new()),
-                                "清除筛选"
-                            }
-                        }
-                        span { class: "tag", "显示 {visible_count} / {user_count}" }
-                    }
-                    if !sorting_enabled {
-                        p { class: "muted users-panel__search-note",
-                            "筛选模式下仅保留管理和预览动作；清除筛选后可继续调整完整顺序。"
+                        button {
+                            class: "button button--ghost button--compact",
+                            r#type: "submit",
+                            onclick: move |_| search_query.set(search_input()),
+                            "搜索"
                         }
                     }
                 }
@@ -117,32 +104,35 @@ pub fn UsersPanel(
                 if user_list.is_empty() {
                     div { class: "empty-state",
                         strong { "还没有订阅组" }
-                        p { "先新建一个订阅组，再开始维护它的源链接和公开订阅输出。" }
-                    }
-                } else if visible_users.is_empty() {
-                    div { class: "empty-state",
-                        strong { "没有匹配的订阅组" }
-                        p { "试试其他关键词，或者清除当前筛选后查看完整订阅组列表。" }
                     }
                 } else {
                     div { class: "user-list",
-                        for (index, user) in visible_users.clone().into_iter().enumerate() {
-                            UserRow {
-                                key: "{user.username}",
-                                index,
-                                user,
-                                users: user_list.clone(),
-                                selected: selected.clone(),
-                                sorting_enabled,
-                                pending,
-                                feedback,
-                                refresh,
+                        if visible_users.is_empty() {
+                            div { class: "empty-state empty-state--compact",
+                                strong { "没有匹配的订阅组" }
+                            }
+                        } else {
+                            for user in visible_users.into_iter() {
+                                UserRow {
+                                    key: "{user.username}",
+                                    user,
+                                    users: user_list.clone(),
+                                    selected: selected.clone(),
+                                    editor_username,
+                                    sorting_enabled,
+                                    dragging_username,
+                                    drop_target,
+                                    pending,
+                                    feedback,
+                                    refresh,
+                                    reorder_pending,
+                                }
                             }
                         }
                     }
                 }
             } else {
-                p { class: "muted", "正在加载订阅组..." }
+                p { class: "muted", "加载中…" }
             }
         }
     }
@@ -150,33 +140,37 @@ pub fn UsersPanel(
 
 #[component]
 fn UserRow(
-    index: usize,
     user: UserSummary,
     users: Vec<UserSummary>,
     selected: Option<String>,
+    mut editor_username: Signal<Option<String>>,
     sorting_enabled: bool,
+    mut dragging_username: Signal<Option<String>>,
+    mut drop_target: Signal<Option<SortDropTarget>>,
     pending: PendingState,
     feedback: FeedbackSignals,
     refresh: RefreshState,
+    reorder_pending: bool,
 ) -> Element {
-    let navigator = use_navigator();
     let is_selected = selected.as_deref() == Some(user.username.as_str());
+    let is_dragging = dragging_username().as_deref() == Some(user.username.as_str());
+    let is_drop_target = drop_target() == Some(SortDropTarget::Row(user.username.clone()));
     let username = user.username.clone();
-    let username_for_select = username.clone();
+    let username_for_drag = username.clone();
+    let username_for_drag_target = username.clone();
+    let username_for_drop_target = username.clone();
+    let username_for_leave = username.clone();
     let username_for_up = username.clone();
     let username_for_down = username.clone();
-    let username_for_top = username.clone();
-    let username_for_bottom = username.clone();
+    let users_for_drop = users.clone();
+    let users_for_up = users.clone();
+    let users_for_down = users.clone();
     let public_route = format!("/{username}");
-    let order_source_for_up = users.clone();
-    let order_source_for_down = users.clone();
-    let order_source_for_top = users.clone();
-    let order_source_for_bottom = users.clone();
-    let can_move_up = index > 0;
-    let can_move_down = index + 1 < users.len();
-    let can_move_to_top = can_move_up;
-    let can_move_to_bottom = can_move_down;
-    let card_class = if is_selected {
+    let row_class = if is_drop_target {
+        "user-card user-card--drop"
+    } else if is_dragging {
+        "user-card user-card--dragging"
+    } else if is_selected {
         "user-card user-card--selected"
     } else {
         "user-card"
@@ -186,126 +180,146 @@ fn UserRow(
     } else {
         "button button--ghost button--compact"
     };
-    let order_label = format!("#{}", index + 1);
-    let reorder_pending = (pending.reorder_users)();
+    let sort_class = if reorder_pending || !sorting_enabled {
+        "user-card__sort user-card__sort--disabled"
+    } else if is_dragging {
+        "user-card__sort user-card__sort--dragging"
+    } else {
+        "user-card__sort"
+    };
 
     rsx! {
-        article { class: "{card_class}",
+        article {
+            class: "{row_class}",
+            ondragover: move |event| {
+                if !sorting_enabled || reorder_pending {
+                    return;
+                }
+
+                event.prevent_default();
+                drop_target.set(Some(SortDropTarget::Row(
+                    username_for_drag_target.clone(),
+                )));
+            },
+            ondragleave: move |_| {
+                if drop_target() == Some(SortDropTarget::Row(username_for_leave.clone())) {
+                    drop_target.set(None);
+                }
+            },
+            ondrop: move |event| {
+                if !sorting_enabled || reorder_pending {
+                    return;
+                }
+
+                event.prevent_default();
+                if let Some(dragged) = dragging_username()
+                    && let Some(order) =
+                        actions::move_username_before(
+                            &users_for_drop,
+                            &dragged,
+                            &username_for_drop_target,
+                        )
+                {
+                    actions::submit_user_order(
+                        order,
+                        pending.reorder_users,
+                        feedback,
+                        refresh,
+                    );
+                }
+
+                dragging_username.set(None);
+                drop_target.set(None);
+            },
             div { class: "user-card__meta",
-                div { class: "user-card-head",
-                    div {
-                        strong { "{user.username}" }
-                        p { class: "muted", "公开订阅地址 " code { "/{user.username}" } }
-                    }
-                    div { class: "badge-row",
-                        if is_selected {
-                            span { class: "tag tag--accent", "当前订阅组" }
-                        }
-                        span { class: "tag", "{order_label}" }
+                strong { "{user.username}" }
+                if is_selected {
+                    div { class: "user-card__subline",
+                        span { class: "user-card__current", "当前" }
                     }
                 }
             }
-            div { class: "user-card__actions",
-                div { class: "button-row user-card__primary-actions",
-                    button {
-                        class: "{edit_button_class}",
-                        r#type: "button",
-                        onclick: move |_| {
-                            navigator.push(Route::UserDetail {
-                                username: username_for_select.clone(),
-                            });
-                        },
-                        "管理"
-                    }
-                    a {
-                        class: "button button--ghost button--compact",
-                        href: "{public_route}",
-                        target: "_blank",
-                        rel: "noreferrer",
-                        "预览"
-                    }
+            div { class: "user-card__buttons",
+                button {
+                    class: "{edit_button_class}",
+                    r#type: "button",
+                    onclick: move |_| editor_username.set(Some(username.clone())),
+                    "管理"
                 }
-                if sorting_enabled {
-                    div { class: "button-row user-card__reorder",
-                        button {
-                            class: "button button--ghost button--compact",
-                            r#type: "button",
-                            disabled: reorder_pending || !can_move_to_top,
-                            aria_busy: if reorder_pending { "true" } else { "false" },
-                            onclick: move |_| {
-                                if let Some(order) =
-                                    actions::move_username_to_edge(&order_source_for_top, &username_for_top, true)
-                                {
-                                    actions::submit_user_order(
-                                        order,
-                                        pending.reorder_users,
-                                        feedback,
-                                        refresh,
-                                    );
-                                }
-                            },
-                            if reorder_pending { "排序中…" } else { "置顶" }
-                        }
-                        button {
-                            class: "button button--ghost button--compact",
-                            r#type: "button",
-                            disabled: reorder_pending || !can_move_up,
-                            aria_busy: if reorder_pending { "true" } else { "false" },
-                            onclick: move |_| {
-                                if let Some(order) =
-                                    actions::reordered_usernames(&order_source_for_up, &username_for_up, -1)
-                                {
-                                    actions::submit_user_order(
-                                        order,
-                                        pending.reorder_users,
-                                        feedback,
-                                        refresh,
-                                    );
-                                }
-                            },
-                            if reorder_pending { "排序中…" } else { "上移" }
-                        }
-                        button {
-                            class: "button button--ghost button--compact",
-                            r#type: "button",
-                            disabled: reorder_pending || !can_move_down,
-                            aria_busy: if reorder_pending { "true" } else { "false" },
-                            onclick: move |_| {
-                                if let Some(order) =
-                                    actions::reordered_usernames(&order_source_for_down, &username_for_down, 1)
-                                {
-                                    actions::submit_user_order(
-                                        order,
-                                        pending.reorder_users,
-                                        feedback,
-                                        refresh,
-                                    );
-                                }
-                            },
-                            if reorder_pending { "排序中…" } else { "下移" }
-                        }
-                        button {
-                            class: "button button--ghost button--compact",
-                            r#type: "button",
-                            disabled: reorder_pending || !can_move_to_bottom,
-                            aria_busy: if reorder_pending { "true" } else { "false" },
-                            onclick: move |_| {
-                                if let Some(order) =
-                                    actions::move_username_to_edge(&order_source_for_bottom, &username_for_bottom, false)
-                                {
-                                    actions::submit_user_order(
-                                        order,
-                                        pending.reorder_users,
-                                        feedback,
-                                        refresh,
-                                    );
-                                }
-                            },
-                            if reorder_pending { "排序中…" } else { "置底" }
-                        }
-                    }
+                a {
+                    class: "button button--ghost button--compact",
+                    href: "{public_route}",
+                    target: "_blank",
+                    rel: "noreferrer",
+                    "预览"
                 }
+            }
+            div {
+                class: "{sort_class}",
+                draggable: (sorting_enabled && !reorder_pending).to_string(),
+                tabindex: "0",
+                role: "button",
+                aria_grabbed: if is_dragging { "true" } else { "false" },
+                aria_label: "拖拽调整 {user.username} 排序",
+                ondragstart: move |event| {
+                    if !sorting_enabled || reorder_pending {
+                        return;
+                    }
+
+                    let transfer = event.data_transfer();
+                    let _ = transfer.set_data("text/plain", &username_for_drag);
+                    transfer.set_effect_allowed("move");
+                    dragging_username.set(Some(username_for_drag.clone()));
+                    drop_target.set(Some(SortDropTarget::Row(username_for_drag.clone())));
+                },
+                ondragend: move |_| {
+                    dragging_username.set(None);
+                    drop_target.set(None);
+                },
+                onkeydown: move |event| {
+                    if !sorting_enabled || reorder_pending {
+                        return;
+                    }
+
+                    let next_order = match event.key() {
+                        Key::ArrowUp => {
+                            event.prevent_default();
+                            actions::reordered_usernames(&users_for_up, &username_for_up, -1)
+                        }
+                        Key::ArrowDown => {
+                            event.prevent_default();
+                            actions::reordered_usernames(&users_for_down, &username_for_down, 1)
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(order) = next_order {
+                        actions::submit_user_order(
+                            order,
+                            pending.reorder_users,
+                            feedback,
+                            refresh,
+                        );
+                    }
+                },
+                span { class: "user-card__sort-icon", "⋮⋮" }
             }
         }
     }
+}
+
+fn filter_users(users: &[UserSummary], normalized_query: &str) -> Vec<UserSummary> {
+    if normalized_query.is_empty() {
+        return users.to_vec();
+    }
+
+    users
+        .iter()
+        .filter(|user| {
+            user.username
+                .to_ascii_lowercase()
+                .contains(normalized_query)
+        })
+        .cloned()
+        .collect()
 }

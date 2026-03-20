@@ -3,18 +3,13 @@ use std::collections::HashSet;
 use submora_core::is_valid_source_url;
 use submora_shared::{
     auth::{CurrentUserResponse, LoginRequest, UpdateAccountRequest},
-    users::{
-        CreateUserRequest, LinksPayload, UserCacheStatusResponse, UserDiagnosticsResponse,
-        UserLinksResponse, UserOrderPayload, UserSummary,
-    },
+    users::{CreateUserRequest, LinksPayload, UserLinksResponse, UserOrderPayload, UserSummary},
 };
 
 use crate::api;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DraftLinkStats {
-    pub raw_line_count: usize,
-    pub non_empty_count: usize,
     pub normalized_count: usize,
     pub blank_count: usize,
     pub duplicate_count: usize,
@@ -34,24 +29,6 @@ pub async fn load_users() -> Result<Vec<UserSummary>, String> {
 pub async fn load_links(username: Option<String>) -> Result<Option<UserLinksResponse>, String> {
     match username {
         Some(username) => api::get_links(&username).await.map(Some),
-        None => Ok(None),
-    }
-}
-
-pub async fn load_diagnostics(
-    username: Option<String>,
-) -> Result<Option<UserDiagnosticsResponse>, String> {
-    match username {
-        Some(username) => api::get_diagnostics(&username).await.map(Some),
-        None => Ok(None),
-    }
-}
-
-pub async fn load_cache_status(
-    username: Option<String>,
-) -> Result<Option<UserCacheStatusResponse>, String> {
-    match username {
-        Some(username) => api::get_cache_status(&username).await.map(Some),
         None => Ok(None),
     }
 }
@@ -81,16 +58,6 @@ pub async fn save_links(username: String, links_text: String) -> Result<UserLink
         links: parse_links(&links_text),
     };
     api::set_links(&username, &payload).await
-}
-
-pub async fn refresh_cache(username: String) -> Result<UserCacheStatusResponse, String> {
-    api::refresh_cache(&username).await
-}
-
-pub async fn clear_cache(username: String) -> Result<String, String> {
-    api::clear_cache(&username)
-        .await
-        .map(|_| "缓存已清空".to_string())
 }
 
 pub async fn update_account(
@@ -127,10 +94,6 @@ pub fn parse_links(links_text: &str) -> Vec<String> {
         .collect()
 }
 
-pub fn count_links(links_text: &str) -> usize {
-    parse_links(links_text).len()
-}
-
 pub fn analyze_links(links_text: &str, preview_limit: usize) -> DraftLinkStats {
     let raw_lines = if links_text.is_empty() {
         Vec::new()
@@ -139,21 +102,18 @@ pub fn analyze_links(links_text: &str, preview_limit: usize) -> DraftLinkStats {
     };
 
     let mut seen = HashSet::new();
-    let mut non_empty_count = 0usize;
     let mut blank_count = 0usize;
     let mut duplicate_count = 0usize;
     let mut invalid_count = 0usize;
     let mut first_invalid = None;
     let mut normalized_preview = Vec::new();
 
-    for raw_line in raw_lines.iter().copied() {
+    for raw_line in raw_lines.iter() {
         let trimmed = raw_line.trim();
         if trimmed.is_empty() {
             blank_count += 1;
             continue;
         }
-
-        non_empty_count += 1;
 
         if !is_valid_source_url(trimmed) {
             invalid_count += 1;
@@ -174,8 +134,6 @@ pub fn analyze_links(links_text: &str, preview_limit: usize) -> DraftLinkStats {
     }
 
     DraftLinkStats {
-        raw_line_count: raw_lines.len(),
-        non_empty_count,
         normalized_count: seen.len(),
         blank_count,
         duplicate_count,
@@ -184,4 +142,3 @@ pub fn analyze_links(links_text: &str, preview_limit: usize) -> DraftLinkStats {
         normalized_preview,
     }
 }
-
